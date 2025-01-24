@@ -2,27 +2,29 @@ package com.example.biometric.service;
 
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.List;
+
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.example.biometric.dto.EmployeeRequestDto;
 import com.example.biometric.dto.EmployeeResponseDto;
+
 import com.example.biometric.entity.Employee;
 import com.example.biometric.mapper.EmployeeMapper;
+
 import com.example.biometric.repositories.EmployeeRepository;
 
 @Service
 public class EmployeeService {
 	
 	@Autowired
-	private EmployeeRepository repository;
+	private EmployeeRepository employeeRepository;
 	
 	@Autowired
 	private EmployeeMapper employeeMapper;
-	
-	
+
+		
 	public String hashFingerprint(String fingerprintData) throws NoSuchAlgorithmException{
 		
 		MessageDigest digest = MessageDigest.getInstance("SHA-256");
@@ -49,7 +51,7 @@ public class EmployeeService {
 		Employee employee = employeeMapper.toEntity(requestDto);
 		employee.setFingerprintHash(fingerprintHash);
 		
-		Employee savedEmployee= repository.save(employee);
+		Employee savedEmployee= employeeRepository.save(employee);
 		
 		return employeeMapper.toRepsonseDto(savedEmployee);
 		
@@ -60,15 +62,9 @@ public class EmployeeService {
             throw new IllegalArgumentException("Fingerprint data cannot be null or empty.");
         }
 		String fingerprintHash= hashFingerprint(fingerprintData);
-		return repository.findByFingerprintHash(fingerprintHash).isPresent();
+		return employeeRepository.findByFingerprintHash(fingerprintHash).isPresent();
 		
 	}
 
-
-	public List<Employee> getEmployee() {
-		List<Employee> employee = repository.findAll();
-		return employee;
-	}
-	
 	
 }
