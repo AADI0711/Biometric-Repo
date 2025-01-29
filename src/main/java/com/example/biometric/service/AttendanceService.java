@@ -12,12 +12,13 @@ import com.example.biometric.repositories.MonthlyAttendanceRepository;
 import com.example.biometric.repositories.EmployeeRepository;
 import com.example.biometric.repositories.HolidayListRepository;
 
+import jakarta.annotation.PostConstruct; // For Spring Boot 3.0+ and Jakarta EE 9+
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
 import java.time.YearMonth;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class AttendanceService {
@@ -34,27 +35,39 @@ public class AttendanceService {
     @Autowired
     private MonthlyAttendanceRepository monthlyAttendanceRepository;
 
+    // In-memory hash map for fingerprint hashes and employee IDs
+    private final Map<String, Long> fingerprintHashMap = new ConcurrentHashMap<>();
+
+    @PostConstruct
+    public void preloadFingerprintHashes() {
+        List<Employee> employees = employeeRepository.findAll();
+        for (Employee employee : employees) {
+            fingerprintHashMap.put(employee.getFingerprintHash(), employee.getId());
+        }
+        System.out.println("Preloaded fingerprint hashes for " + fingerprintHashMap.size() + " employees.");
+    }
+
     public String markAttendance(String fingerprintData) throws Exception {
         // Generate fingerprint hash
         String fingerprintHash = hashFingerprint(fingerprintData);
         System.out.println("Generated Fingerprint Hash: " + fingerprintHash);
 
-        // Validate fingerprint with database
-        Optional<Employee> optionalEmployee = employeeRepository.findByFingerprintHash(fingerprintHash);
-        if (optionalEmployee.isEmpty()) {
+        Long employeeId = fingerprintHashMap.get(fingerprintHash);
+        if (employeeId == null) {
             throw new IllegalArgumentException("Invalid fingerprint data. No matching employee found.");
         }
 
-        Employee employee = optionalEmployee.get();
         LocalDate today = LocalDate.now();
 
         // Check if attendance is already marked for today
-        Optional<Attendance> existingAttendance = attendanceRepository.findByEmployeeIdAndDate(employee.getId(), today);
+        Optional<Attendance> existingAttendance = attendanceRepository.findByEmployeeIdAndDate(employeeId, today);
         if (existingAttendance.isPresent()) {
             return "Attendance already marked for today.";
         }
 
         // Mark attendance
+        Employee employee = employeeRepository.findById(employeeId)
+                .orElseThrow(() -> new IllegalArgumentException("Employee not found for the given ID."));
         Attendance attendance = new Attendance();
         attendance.setEmployee(employee);
         attendance.setDate(today);
@@ -93,7 +106,6 @@ public class AttendanceService {
                             && a.getStatus())
                     .count();
 
-            // Updated logic for retrieving or creating a new MonthlyAttendance record
             MonthlyAttendance monthlyAttendance = monthlyAttendanceRepository
                     .findByEmployeeAndMonthAndYear(employee, year, month)
                     .orElseGet(() -> {
@@ -101,16 +113,12 @@ public class AttendanceService {
                         newRecord.setEmployee(employee);
                         newRecord.setYear(year);
                         newRecord.setMonth(month);
-                        newRecord.setTotalWorkingDays(0); // Default value
-                        newRecord.setDaysPresent(0);     // Default value
                         return newRecord;
                     });
 
-            // Set values for the current month
-            monthlyAttendance.setTotalWorkingDays(totalWorkingDays); // Ensure it's properly set
-            monthlyAttendance.setDaysPresent((int) presentDays);     // Ensure it's properly set
+            monthlyAttendance.setTotalWorkingDays(totalWorkingDays);
+            monthlyAttendance.setDaysPresent((int) presentDays);
 
-            // Save the updated or new MonthlyAttendance record
             monthlyAttendanceRepository.save(monthlyAttendance);
         }
     }
