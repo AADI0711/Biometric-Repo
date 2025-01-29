@@ -2,6 +2,8 @@
 <section name="Workbench">
 	<section name="MavenProjectImportWizardPage">
 		<list key="rootDirectory">
+			<item value="D:\Development\workspace\sts\Project\Biometric-Repo"/>
+			<item value="D:\Development\workspace\sts\Project\Biometric-Repo\src"/>
 			<item value="D:\development\workspaces\sts\biometric\biometric"/>
 		</list>
 		<list key="projectNameTemplate">
